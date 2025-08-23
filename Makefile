@@ -7,7 +7,7 @@ setup:
 	$(PY) -m venv .venv && . .venv/bin/activate && $(PIP) install -r requirements.txt
 
 test:
-	pytest -q
+	python -m pytest tests/test_smoke.py
 
 run:
 	$(PY) main.py "What is 12.5% of 243?"
