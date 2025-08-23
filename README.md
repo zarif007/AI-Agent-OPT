@@ -1,60 +1,34 @@
-# Refactor & Extend: Simple Tool-Using Agent
+# Architecture & Design
 
-**Goal:** Turn a brittle, partially working agent into production-quality code, then extend it with a new tool and real tests.
+Our system follows a **multi-agent, DAG-based (Directed Acyclic Graph) architecture**. A single user prompt can be orchestrated into multiple tool invocations, where execution order is governed by **`TOOL_PRIORITY`**.
 
----
-You must **refactor for robustness**, **add one new tool** (translator / unit converter), and **add proper tests**.
----
+Each tool execution is strictly dependent on the successful completion of its prerequisite tasks. This ensures deterministic flow control and eliminates race conditions between interdependent tasks.
 
-## Your Tasks (Summary)
+To facilitate smooth data handoff between tasks, we have introduced a **Context Manager**. It maintains the execution context of previously completed tasks, making their outputs readily accessible for downstream tasks. As a result, every tool operates with the most relevant, updated context, significantly reducing redundancy and improving orchestration efficiency.
 
-1. **Refactor**
-2. **Improve**
-3. **Add ONE new tool** 
-4. **Write tests**
-5. **Improve Documentation**
+<p align="center">
+  <img src="assets/dag.png" alt="DAG Architecture" width="600"/>
+</p>
 
-See the assignment brief for full details (shared in the job post).
+### Example DAG Flow
 
----
+Consider the user prompt:
+_"Add 10 to the average temperature in Paris and London right now."_
 
-## Quick Start
+The orchestration layer builds the following DAG:
 
-### Python 3.10+ recommended
+- **Tool A (Temp Tool)**
 
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-```
+  - Fetches the current temperature in Paris.
+  - No dependencies.
 
-### Run
+- **Tool B (Temp Tool)**
 
-```bash
-python main.py "What is 12.5% of 243?"
-python main.py "Summarize today's weather in Paris in 3 words"
-python main.py "Who is Ada Lovelace?"
-python main.py "Add 10 to the average temperature in Paris and London right now."
-```
+  - Fetches the current temperature in London.
+  - No dependencies.
 
-### Test
+- **Tool C (Calc Tool)**
 
-```bash
-pytest -q
-```
-
-> Note: The fake LLM sometimes emits malformed JSON to simulate real-world flakiness.
-
----
-
-## What we expect you to change
-
-- Split responsibilities into modules/classes.
-- Add a schema for tool plans; validate inputs and tool names.
-- Make tool calls resilient and typed;
-- Add one new tool and tests that prove your design is extensible.
-- Update this README with an architecture diagram (ASCII ok) and clear instructions.
-- You can use Real LLMs or a fake one, but ensure your code is robust against malformed responses.
-
-Good luck & have fun!
-# AI-Agent-OPT
+  - Computes the average of Paris and London temperatures.
+  - Adds 10 to the computed average.
+  - **Depends on Tool A and Tool B**.

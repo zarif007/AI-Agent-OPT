@@ -74,7 +74,7 @@ def evaluate(expr: str, context: dict = None) -> float:
         a = values.pop()
         values.append(apply_operation(a, b, ops.pop()))
     
-    ans = values[-1] if values else None
+    ans = values[-1] if values else 0
     context[expr] = ans
     return ans
 
