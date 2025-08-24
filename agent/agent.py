@@ -12,6 +12,8 @@ def answer(q: str):
     results = []
     context = {}
 
+    print(tasks)
+
     if tasks and isinstance(tasks, list):
         for sub_tasks in tasks:
             if isinstance(sub_tasks, dict) and "tool" in sub_tasks:

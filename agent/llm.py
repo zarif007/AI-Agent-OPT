@@ -1,4 +1,6 @@
 import json
+import re
+import string
 from typing import List, Dict, Optional, Union
 from constants import OP_MAP, WEATHER, JOB_KEYWORDS, ROLE_KEYWORDS, LOCATION_KEYWORDS, DATE_KEYWORDS, COMPANY_KEYWORDS
 from utils.info_logger import info_logger
@@ -44,24 +46,44 @@ def extract_weather_tool(prompt: str) -> List[Dict[str, any]]:
     return [{"tool": "weather", "args": {"city": city, "keyword": matched_keyword}} for city in mentioned_cities]
 
 def extract_kb_tool(prompt: str) -> Optional[Dict[str, any]]:
-    """Checks if the prompt is a 'who is' query and returns a kb tool call 
-    if any kb entry name exists in the prompt string (anywhere)."""
+    """Detect KB query if an entry name OR any exact (non-stopword) word from its summary exists in the prompt."""
+
+    STOP_WORDS = {
+        "a", "an", "and", "are", "as", "at", "be", "by",
+        "for", "from", "has", "he", "in", "is", "it", "its", "'s", "s",
+        "of", "on", "that", "the", "to", "was", "were", "will", "with"
+    }
+
+    def tokenize(text: str) -> list:
+        text = text.lower()
+        text = re.sub(f"[{re.escape(string.punctuation)}]", " ", text)
+        return [w for w in text.split() if w]
 
     try:
         with open("data/kb.json", "r", encoding="utf-8") as f:
             kb = json.load(f)
 
-        prompt_lower = prompt.lower()
+        prompt_words = tokenize(prompt)
+
         for entry in kb.get("entries", []):
-            if entry["name"].lower() in prompt_lower:
-                logger.info(f"extract_kb_tool: Detected KB query for '{entry['name']}' in prompt: {prompt}")
+            name = entry["name"].lower()
+            summary_words = set(tokenize(entry.get("summary", "")))
+
+            if name in prompt.lower():
+                logger.info(f"extract_kb_tool: Detected KB query for '{entry['name']}' (name match) in prompt: {prompt}")
                 return {"tool": "kb", "args": {"q": entry["name"]}}
 
+            for word in prompt_words:
+                if word not in STOP_WORDS and word in summary_words:
+                    logger.info(f"extract_kb_tool: Detected KB query for '{entry['name']}' (matched word '{word}') in prompt: {prompt}")
+                    return {"tool": "kb", "args": {"q": word}}
+
         return None
 
-    except (FileNotFoundError, json.JSONDecodeError):
-        logger.error(f"extract_kb_tool: Error reading kb.json for prompt: {prompt}")
+    except Exception as e:
+        logger.error(f"extract_kb_tool: Error reading or processing kb.json: {e}")
         return None
+
 
 def extract_job_search_tool(prompt: str) -> Optional[Dict[str, any]]:
     """Checks if the prompt involves a job search and returns a job_search tool call if applicable."""

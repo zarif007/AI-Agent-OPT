@@ -117,16 +117,29 @@ def temp(city: str, keyword: str, context: dict = None) -> str:
 
 def kb_lookup(q: str, context: dict = None) -> str:
     try:
-        with open("data/kb.json","r") as f:
+        with open("data/kb.json", "r", encoding="utf-8") as f:
             data = json.load(f)
+        q_lower = q.lower()
+
         for item in data.get("entries", []):
-            if q in item.get("name",""):
-                ans = item.get("summary","")
-                context[q] = ans
-                logger.info(f"kb_lookup: Found summary for '{q}'")
+            name = item.get("name", "")
+            summary = item.get("summary", "")
+            if q_lower in name.lower():
+                ans = summary
+                if context is not None:
+                    context[q] = ans
+                logger.info(f"kb_lookup: Found summary for '{q}' by name match")
                 return ans
+            summary_words = re.findall(r"\w+", summary.lower())
+            if q_lower in summary_words:
+                if context is not None:
+                    context[q] = name
+                logger.info(f"kb_lookup: Found entry '{name}' for summary word match '{q}'")
+                return name
+
         logger.info(f"kb_lookup: No entry found for '{q}'")
         return "No entry found."
+
     except Exception as e:
         logger.error(f"kb_lookup: Error for '{q}': {e}")
         return f"KB error: {e}"

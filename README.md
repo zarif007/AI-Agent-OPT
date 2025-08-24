@@ -31,6 +31,8 @@ The orchestration layer builds the following DAG:
   - Adds 10 to the computed average.
   - **Depends on Tool A and Tool B**.
 
+---
+
 # Installation & Running
 
 There is a `Makefile` to simplify setup, testing, and running. You can either use the provided make targets or follow the manual steps.
@@ -95,6 +97,8 @@ If you prefer not to use `make`:
    ```bash
    python main.py "What is 12.5% of 243?"
    ```
+
+---
 
 # Tools & Functionalities
 
@@ -196,24 +200,76 @@ Prompt: _"Find software engineer roles in Dhaka posted last week."_
 
 ---
 
-### Orchestration Example
+# Logging & Testing
 
-Prompt:
-_"Add 10 to the average temperature in Paris and London right now."_
+We rely on two distinct loggers and a comprehensive smoke test suite to ensure reliability and observability of the agentic system.
 
-1. **Fake LLM** detects → needs `Temp Tool` (Paris, London), `Calc Tool` (average, +10).
-2. **Execution DAG:**
+---
+
+### ✅ Test Suite
+
+- Location: **`/tests/test_smoke.py`**
+- Contains **42 smoke tests** covering all four tools (`Calc Tool`, `Temp Tool`, `Knowledge Base Tool`, `Job Search Tool`).
+- Each test validates both correctness and orchestration flow across the DAG execution.
+- Ensures that any regression or change in one tool surfaces immediately.
+
+Run tests via:
+
+```bash
+make test
+```
+
+or manually:
+
+```bash
+pytest tests/test_smoke.py
+```
+
+---
+
+### ✅ Info Logger
+
+The **Info Logger** provides step-by-step execution traces for every prompt. This makes debugging transparent and enables reproducibility of tool flows.
+
+**Example Log:**
 
 ```
-Temp(Paris) ─┐
-             ├─> Calc(Average) ──> Calc(+10) ──> Final Output
-Temp(London) ┘
+2025-08-24 17:17:42,363 INFO answer: Received question: What is the average of 10 and 20, plus 5% of 200?
+2025-08-24 17:17:42,363 INFO extract_calc_tool: Detected calculation in prompt: what is the average of 10 and 20, plus 5% of 200?
+2025-08-24 17:17:42,363 INFO call_llm: Selected tools (ordered): ['calc']
+2025-08-24 17:17:42,363 INFO answer: Calling evaluate with expr: what is the average of 10 and 20, plus 5% of 200?
+2025-08-24 17:17:42,364 INFO normalize_expr: Normalized expression: what is the A 10  20, + 5% of 200?
+2025-08-24 17:17:42,364 INFO evaluate: Evaluating expression: what is the A 10  20, + 5% of 200?
+2025-08-24 17:17:42,364 INFO evaluate: Result for 'what is the A 10  20, + 5% of 200?' is 25.0
+2025-08-24 17:17:42,364 INFO answer: Final answer: 25.0
 ```
 
-3. **Context Flow:**
+📌 This log captures **every stage of orchestration** — from tool selection, normalization, evaluation, down to the final result.
 
-   - `Temp Tool` writes `{paris: 20, london: 15}`
-   - `Calc Tool` computes `(20+15)/2 = 17.5`
-   - `Calc Tool` adds 10 → `27.5`
+---
 
-4. **Result:** `"The final answer is 27.5"`
+### ✅ LLM Cost Logger
+
+Even though the system uses a **fake LLM**, we simulate realistic logging of LLM usage and cost. This ensures the framework is cost-aware and easily portable to real APIs (e.g., OpenAI, Anthropic).
+
+- We assume a **base system prompt cost of 812 tokens**.
+- Cost model:
+
+  ```
+  1M tokens (input + output) = $1
+  cost = total_tokens / 1_000_000
+  ```
+
+- `total_tokens = 812 + prompt_tokens + output_tokens`
+
+**Example Log:**
+
+```
+2025-08-24 17:17:42,363 Prompt: What is the average of 10 and 20, plus 5% of 200? | Total Tokens: 836 | Cost: $0.000836
+```
+
+This cost logger provides **per-prompt transparency** into token accounting and cost estimation, critical for scaling when replacing the fake LLM with a production model.
+
+---
+
+Together, these loggers provide both **debug visibility** and **operational cost tracking**, while the smoke tests guarantee consistent correctness across tool orchestration.

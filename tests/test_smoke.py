@@ -160,3 +160,11 @@ def test_job_search_missing_args():
 def test_kb_empty_context():
     out = answer("Who is ?")
     assert isinstance(out, str)
+
+def test_kb_from_summary_context_alan():
+    out = answer("who was the father of artificial intelligence.")
+    assert out == "Alan Turing"
+
+def test_kb_from_summary_context_ada():
+    out = answer("who worked on Charles Babbage's Analytical Engine.")
+    assert out == "Ada Lovelace"
