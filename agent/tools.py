@@ -1,12 +1,19 @@
 import json
 import re
+import logging
+from datetime import datetime
 from constants import OP_MAP, TEMPS, WEATHER
+from utils.info_logger import info_logger
+
+# Logger setup
+logger = info_logger()
 
 def normalize_expr(expr: str) -> str:
     expr = expr.lower()
     for k in sorted(OP_MAP.keys(), key=lambda x: -len(x)):
         expr = re.sub(rf'\b{k}\b', OP_MAP[k], expr)
     expr = re.sub(r'\band\b', '', expr)
+    logger.info(f"normalize_expr: Normalized expression: {expr}")
     return expr
 
 def tokenize(expr: str):
@@ -41,16 +48,16 @@ def evaluate(expr: str, context: dict = None) -> float:
     tokens = tokenize(expr)
     values = []
     ops = []
-    
+    logger.info(f"evaluate: Evaluating expression: {expr}")
     i = 0
     while i < len(tokens):
         token = tokens[i]
         if re.match(r'^\d+\.?\d*$', token):
             values.append(float(token))
-        elif token == '(':
+        elif token == '(': 
             ops.append(token)
         elif token == ')':
-            while ops and ops[-1] != '(':
+            while ops and ops[-1] != '(': 
                 if len(values) < 2:
                     if len(values) == 1 and ops and ops[-1] == '-':
                         values[-1] = -values[-1]
@@ -91,20 +98,21 @@ def evaluate(expr: str, context: dict = None) -> float:
     
     ans = values[-1] if values else 0
     context[expr] = ans
+    logger.info(f"evaluate: Result for '{expr}' is {ans}")
     return ans
 
 def temp(city: str, keyword: str, context: dict = None) -> str:
     c = (city or "").strip().lower()
     k = (keyword or "").strip().lower()
-    
+    logger.info(f"temp: Query for city='{c}', keyword='{k}'")
     if k.strip().lower() in ["temperature", "temp", "humidity"]:
         ans = TEMPS.get(c, 20)   
     elif k.strip().lower() in ["weather", "condition"]:
         ans = WEATHER.get(c, "clear sky")  
     else:
         ans = TEMPS.get(c, 20)   
-    
     context[c] = ans
+    logger.info(f"temp: Result for city='{c}', keyword='{k}' is '{ans}'")
     return ans
 
 def kb_lookup(q: str, context: dict = None) -> str:
@@ -115,9 +123,12 @@ def kb_lookup(q: str, context: dict = None) -> str:
             if q in item.get("name",""):
                 ans = item.get("summary","")
                 context[q] = ans
+                logger.info(f"kb_lookup: Found summary for '{q}'")
                 return ans
+        logger.info(f"kb_lookup: No entry found for '{q}'")
         return "No entry found."
     except Exception as e:
+        logger.error(f"kb_lookup: Error for '{q}': {e}")
         return f"KB error: {e}"
 
 def job_search(args: dict, context: dict = None) -> list:
@@ -126,6 +137,7 @@ def job_search(args: dict, context: dict = None) -> list:
     date_posted = args.get("date_posted")
     company = args.get("company")
 
+    logger.info(f"job_search: Searching jobs with args: {args}")
     date_patterns = {
         r"(24h|24 hours|today|recently)": "24h",
         r"(1 week|last week|7 days)": "1w",
@@ -143,6 +155,7 @@ def job_search(args: dict, context: dict = None) -> list:
         with open("data/jobs.json", "r", encoding="utf-8") as f:
             jobs_data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
+        logger.error("job_search: Error reading jobs.json")
         return []
 
     jobs = jobs_data.get("jobs", [])
@@ -160,6 +173,7 @@ def job_search(args: dict, context: dict = None) -> list:
 
         results.append(job)
 
+    logger.info(f"job_search: Found {len(results)} jobs for args: {args}")
     return results
 
     
