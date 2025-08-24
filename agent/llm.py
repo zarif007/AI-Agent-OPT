@@ -14,7 +14,7 @@ def extract_weather_tool(prompt: str) -> List[Dict[str, any]]:
     Checks if the prompt involves weather or temperature and returns a list of weather tool calls
     for each mentioned city, including the matched keyword in args.
     """
-    weather_keywords = ["weather", "temperature", "condition", "temp"]
+    weather_keywords = ["weather", "temperature", "condition", "temp", "humidity"]
     cities = set(WEATHER.keys())
     
     matched_keyword = next((keyword for keyword in weather_keywords if keyword in prompt), None)

@@ -23,7 +23,7 @@ def apply_operation(a, b, op):
     if op == '+': return a + b
     if op == '-': return a - b
     if op == '*': return a * b
-    if op == '/': return a / b
+    if op == '/': return a / b if b != 0 else (float("inf") if a >= 0 else float('-inf'))
     if op == '%': return (a / 100) * b
     if op == 'A': return (a + b) / 2
     raise ValueError(f"Unsupported operator {op}")
@@ -52,7 +52,12 @@ def evaluate(expr: str, context: dict = None) -> float:
         elif token == ')':
             while ops and ops[-1] != '(':
                 if len(values) < 2:
-                    break
+                    if len(values) == 1 and ops and ops[-1] == '-':
+                        values[-1] = -values[-1]
+                        ops.pop()
+                        continue
+                    else:
+                        break
                 b = values.pop()
                 a = values.pop()
                 values.append(apply_operation(a, b, ops.pop()))
@@ -60,16 +65,26 @@ def evaluate(expr: str, context: dict = None) -> float:
         else:
             while ops and ops[-1] not in '(' and precedence(ops[-1]) >= precedence(token):
                 if len(values) < 2:
-                    break
+                    if len(values) == 1 and ops and ops[-1] == '-':
+                        values[-1] = -values[-1]
+                        ops.pop()
+                        continue
+                    else:
+                        break
                 b = values.pop()
                 a = values.pop()
                 values.append(apply_operation(a, b, ops.pop()))
             ops.append(token)
         i += 1
-
+    
     while ops:
         if len(values) < 2:
-            break
+            if len(values) == 1 and ops and ops[-1] == '-':
+                values[-1] = -values[-1]
+                ops.pop()
+                continue
+            else:
+                break
         b = values.pop()
         a = values.pop()
         values.append(apply_operation(a, b, ops.pop()))
@@ -82,7 +97,7 @@ def temp(city: str, keyword: str, context: dict = None) -> str:
     c = (city or "").strip().lower()
     k = (keyword or "").strip().lower()
     
-    if k.strip().lower() in ["temperature", "temp"]:
+    if k.strip().lower() in ["temperature", "temp", "humidity"]:
         ans = TEMPS.get(c, 20)   
     elif k.strip().lower() in ["weather", "condition"]:
         ans = WEATHER.get(c, "clear sky")  
