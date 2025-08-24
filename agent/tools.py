@@ -1,9 +1,8 @@
 import json
 import re
-import logging
-from datetime import datetime
 from constants import OP_MAP, TEMPS, WEATHER
-from utils.info_logger import info_logger
+from logger.info_logger import info_logger
+from typing import Any, Dict, List, Optional
 
 # Logger setup
 logger = info_logger()
@@ -16,17 +15,17 @@ def normalize_expr(expr: str) -> str:
     logger.info(f"normalize_expr: Normalized expression: {expr}")
     return expr
 
-def tokenize(expr: str):
+def tokenize(expr: str) -> List[str]:
     expr = expr.strip()
     tokens = re.findall(r'\d+\.?\d*|[+\-*/%A()]', expr)
     return tokens
 
-def precedence(op):
+def precedence(op: str) -> int:
     if op in ('+', '-', 'A'): return 1
     if op in ('*', '/', '%'): return 2
     return 0
 
-def apply_operation(a, b, op):
+def apply_operation(a: float, b: float, op: str) -> float:
     if op == '+': return a + b
     if op == '-': return a - b
     if op == '*': return a * b
@@ -35,19 +34,26 @@ def apply_operation(a, b, op):
     if op == 'A': return (a + b) / 2
     raise ValueError(f"Unsupported operator {op}")
 
-def replace_context(expr: str, context: dict) -> str:
+def replace_context(expr: str, context: Optional[Dict[str, Any]]) -> str:
     if not context:
         return expr
     for key, value in context.items():
         expr = expr.replace(key, str(value))
     return expr
 
-def evaluate(expr: str, context: dict = None) -> float:
+def handle_unary_minus(values: List[float], ops: List[str]) -> bool:
+    if len(values) == 1 and ops and ops[-1] == '-':
+        values[-1] = -values[-1]
+        ops.pop()
+        return True
+    return False
+
+def evaluate(expr: str, context: Optional[Dict[str, Any]] = None) -> float:
     expr = replace_context(expr, context)
     expr = normalize_expr(expr)
-    tokens = tokenize(expr)
-    values = []
-    ops = []
+    tokens: List[str] = tokenize(expr)
+    values: List[float] = []
+    ops: List[str] = []
     logger.info(f"evaluate: Evaluating expression: {expr}")
     i = 0
     while i < len(tokens):
@@ -59,9 +65,7 @@ def evaluate(expr: str, context: dict = None) -> float:
         elif token == ')':
             while ops and ops[-1] != '(': 
                 if len(values) < 2:
-                    if len(values) == 1 and ops and ops[-1] == '-':
-                        values[-1] = -values[-1]
-                        ops.pop()
+                    if handle_unary_minus(values, ops):
                         continue
                     else:
                         break
@@ -72,9 +76,7 @@ def evaluate(expr: str, context: dict = None) -> float:
         else:
             while ops and ops[-1] not in '(' and precedence(ops[-1]) >= precedence(token):
                 if len(values) < 2:
-                    if len(values) == 1 and ops and ops[-1] == '-':
-                        values[-1] = -values[-1]
-                        ops.pop()
+                    if handle_unary_minus(values, ops):
                         continue
                     else:
                         break
@@ -86,9 +88,7 @@ def evaluate(expr: str, context: dict = None) -> float:
     
     while ops:
         if len(values) < 2:
-            if len(values) == 1 and ops and ops[-1] == '-':
-                values[-1] = -values[-1]
-                ops.pop()
+            if handle_unary_minus(values, ops):
                 continue
             else:
                 break
@@ -96,14 +96,15 @@ def evaluate(expr: str, context: dict = None) -> float:
         a = values.pop()
         values.append(apply_operation(a, b, ops.pop()))
     
-    ans = values[-1] if values else 0
-    context[expr] = ans
+    ans: float = values[-1] if values else 0.0
+    if context is not None:
+        context[expr] = ans
     logger.info(f"evaluate: Result for '{expr}' is {ans}")
     return ans
 
-def temp(city: str, keyword: str, context: dict = None) -> str:
-    c = (city or "").strip().lower()
-    k = (keyword or "").strip().lower()
+def temp(city: str, keyword: str, context: Optional[Dict[str, Any]] = None) -> str:
+    c: str = (city or "").strip().lower()
+    k: str = (keyword or "").strip().lower()
     logger.info(f"temp: Query for city='{c}', keyword='{k}'")
     if k.strip().lower() in ["temperature", "temp", "humidity"]:
         ans = TEMPS.get(c, 20)   
@@ -111,11 +112,12 @@ def temp(city: str, keyword: str, context: dict = None) -> str:
         ans = WEATHER.get(c, "clear sky")  
     else:
         ans = TEMPS.get(c, 20)   
-    context[c] = ans
+    if context is not None:
+        context[c] = ans
     logger.info(f"temp: Result for city='{c}', keyword='{k}' is '{ans}'")
     return ans
 
-def kb_lookup(q: str, context: dict = None) -> str:
+def kb_lookup(q: str, context: Optional[Dict[str, Any]] = None) -> str:
     try:
         with open("data/kb.json", "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -144,7 +146,7 @@ def kb_lookup(q: str, context: dict = None) -> str:
         logger.error(f"kb_lookup: Error for '{q}': {e}")
         return f"KB error: {e}"
 
-def job_search(args: dict, context: dict = None) -> list:
+def job_search(args: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     role = args.get("role")
     location = args.get("location")
     date_posted = args.get("date_posted")
@@ -157,7 +159,7 @@ def job_search(args: dict, context: dict = None) -> list:
         r"(1 month|last month|30 days)": "1m"
     }
 
-    mapped_date = None
+    mapped_date: Optional[str] = None
     if date_posted:
         for pattern, mapped_value in date_patterns.items():
             if re.search(pattern, date_posted, re.IGNORECASE):
@@ -172,7 +174,7 @@ def job_search(args: dict, context: dict = None) -> list:
         return []
 
     jobs = jobs_data.get("jobs", [])
-    results = []
+    results: List[Dict[str, Any]] = []
 
     for job in jobs:
         if role and role.lower() != job.get("role", "").lower():

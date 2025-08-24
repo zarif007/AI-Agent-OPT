@@ -3,14 +3,14 @@ import re
 import string
 from typing import List, Dict, Optional, Union
 from constants import OP_MAP, WEATHER, JOB_KEYWORDS, ROLE_KEYWORDS, LOCATION_KEYWORDS, DATE_KEYWORDS, COMPANY_KEYWORDS
-from utils.info_logger import info_logger
-from utils.llm_cost_logger import llm_cost_logger
+from logger.info_logger import info_logger
+from logger.llm_cost_logger import llm_cost_logger
 
 # Logger setup
 logger = info_logger()
 cost_logger = llm_cost_logger()
 
-def log_cost(prompt: str, tools_output: str = ""):
+def log_cost(prompt: str, tools_output: str = "") -> None:
     # 812 tokens for system prompt
     # 1M tokens = $1, so cost = (tokens / 1_000_000)
     prompt_tokens = len(prompt.split())
@@ -46,7 +46,7 @@ def extract_weather_tool(prompt: str) -> List[Dict[str, any]]:
     return [{"tool": "weather", "args": {"city": city, "keyword": matched_keyword}} for city in mentioned_cities]
 
 def extract_kb_tool(prompt: str) -> Optional[Dict[str, any]]:
-    """Detect KB query if an entry name OR any exact (non-stopword) word from its summary exists in the prompt."""
+    """Detect KB query if an entry name OR any exact (non-stop_word) word from its summary exists in the prompt."""
 
     STOP_WORDS = {
         "a", "an", "and", "are", "as", "at", "be", "by",
